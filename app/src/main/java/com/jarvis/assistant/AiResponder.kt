@@ -22,31 +22,30 @@ class AiResponder(private val context: Context) {
         }
 
         return try {
-            val url = URL("https://api.anthropic.com/v1/messages")
+            val url = URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey")
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "POST"
             connection.setRequestProperty("Content-Type", "application/json")
-            connection.setRequestProperty("x-api-key", apiKey)
-            connection.setRequestProperty("anthropic-version", "2023-06-01")
             connection.doOutput = true
             connection.connectTimeout = 15000
             connection.readTimeout = 15000
 
-            val messages = JSONArray()
-            messages.put(JSONObject().put("role", "user").put("content", question))
-
-            val body = JSONObject()
-            body.put("model", "claude-sonnet-4-6")
-            body.put("max_tokens", 300)
-            body.put("messages", messages)
+            val part = JSONObject().put("text", question)
+            val parts = JSONArray().put(part)
+            val content = JSONObject().put("parts", parts)
+            val contents = JSONArray().put(content)
+            val body = JSONObject().put("contents", contents)
 
             connection.outputStream.use { it.write(body.toString().toByteArray()) }
 
             if (connection.responseCode == 200) {
                 val responseText = connection.inputStream.bufferedReader().use { it.readText() }
                 val json = JSONObject(responseText)
-                val content = json.getJSONArray("content")
-                content.getJSONObject(0).getString("text")
+                val candidates = json.getJSONArray("candidates")
+                val firstCandidate = candidates.getJSONObject(0)
+                val contentObj = firstCandidate.getJSONObject("content")
+                val partsArray = contentObj.getJSONArray("parts")
+                partsArray.getJSONObject(0).getString("text")
             } else {
                 val errorText = connection.errorStream?.bufferedReader()?.use { it.readText() }
                 "I couldn't reach the AI. (${connection.responseCode}: ${errorText ?: "unknown error"})"
