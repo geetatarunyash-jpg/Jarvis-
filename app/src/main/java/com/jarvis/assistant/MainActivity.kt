@@ -1,6 +1,7 @@
 package com.jarvis.assistant
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.speech.RecognitionListener
@@ -8,7 +9,6 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.jarvis.assistant.databinding.ActivityMainBinding
 import java.util.Locale
@@ -38,6 +38,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         speechRecognizer.setRecognitionListener(recognitionListener)
 
         binding.micButton.setOnClickListener { checkPermissionAndListen() }
+        binding.settingsButton.setOnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
     }
 
     override fun onInit(status: Int) {
@@ -55,6 +58,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun startListening() {
         binding.statusText.text = "Listening..."
+        binding.pulseRing.visibility = android.view.View.VISIBLE
+        binding.pulseRing.startAnimation(android.view.animation.AnimationUtils.loadAnimation(this, R.anim.pulse_scale))
+
         val intent = android.content.Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.US)
@@ -62,8 +68,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         speechRecognizer.startListening(intent)
     }
 
+    private fun stopListeningAnimation() {
+        binding.pulseRing.clearAnimation()
+        binding.pulseRing.visibility = android.view.View.INVISIBLE
+    }
+
     private fun respond(text: String) {
         runOnUiThread {
+            stopListeningAnimation()
             binding.transcriptText.text = text
             binding.statusText.text = "Tap the mic and speak"
             if (ttsReady) tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
@@ -79,6 +91,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
 
         override fun onError(error: Int) {
+            stopListeningAnimation()
             binding.statusText.text = "Didn't catch that — tap to try again"
         }
 
