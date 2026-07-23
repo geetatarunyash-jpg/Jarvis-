@@ -13,6 +13,7 @@ class CommandProcessor(
 ) {
     private val appLauncher = AppLauncher(context)
     private val webInfoFetcher = WebInfoFetcher()
+    private val aiResponder = AiResponder(context)
     private val ioExecutor = Executors.newSingleThreadExecutor()
 
     fun process(rawText: String) {
@@ -89,10 +90,10 @@ class CommandProcessor(
             onResponse("What would you like to know about?")
             return
         }
-        onResponse("Let me look that up...")
+        onResponse("Thinking...")
         ioExecutor.execute {
-            val summary = webInfoFetcher.fetchSummary(topic)
-            onResponse(summary)
+            val answer = aiResponder.ask(topic)
+            onResponse(answer)
         }
     }
 
