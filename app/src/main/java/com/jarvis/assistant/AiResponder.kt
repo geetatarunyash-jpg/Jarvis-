@@ -39,4 +39,21 @@ class AiResponder(private val context: Context) {
             body.put("messages", messages)
             body.put("max_tokens", 300)
 
-            connection.outputStream.use
+            connection.outputStream.use { it.write(body.toString().toByteArray()) }
+
+            if (connection.responseCode == 200) {
+                val responseText = connection.inputStream.bufferedReader().use { it.readText() }
+                val json = JSONObject(responseText)
+                val choices = json.getJSONArray("choices")
+                val firstChoice = choices.getJSONObject(0)
+                val message = firstChoice.getJSONObject("message")
+                message.getString("content")
+            } else {
+                val errorText = connection.errorStream?.bufferedReader()?.use { it.readText() }
+                "I couldn't reach the AI. (${connection.responseCode}: ${errorText ?: "unknown error"})"
+            }
+        } catch (e: Exception) {
+            "I couldn't reach the AI right now. Check your internet connection."
+        }
+    }
+}
