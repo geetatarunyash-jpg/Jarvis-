@@ -60,4 +60,48 @@ class WakeWordService : Service(), TextToSpeech.OnInitListener {
         isListening = true
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(Recognizer
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.US)
+        }
+        speechRecognizer.startListening(intent)
+    }
+
+    private val recognitionListener = object : RecognitionListener {
+        override fun onResults(results: Bundle?) {
+            isListening = false
+            val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+            val heard = matches?.firstOrNull()?.lowercase().orEmpty()
+
+            if (heard.contains("jarvis")) {
+                val command = heard.replace("jarvis", "", ignoreCase = true).trim()
+                if (command.isNotEmpty()) {
+                    commandProcessor.process(command)
+                } else {
+                    if (ttsReady) tts.speak("Yes?", TextToSpeech.QUEUE_FLUSH, null, null)
+                }
+            }
+            startListeningLoop()
+        }
+
+        override fun onError(error: Int) {
+            isListening = false
+            startListeningLoop()
+        }
+
+        override fun onReadyForSpeech(params: Bundle?) {}
+        override fun onBeginningOfSpeech() {}
+        override fun onRmsChanged(rmsdB: Float) {}
+        override fun onBufferReceived(buffer: ByteArray?) {}
+        override fun onEndOfSpeech() {}
+        override fun onPartialResults(partialResults: Bundle?) {}
+        override fun onEvent(eventType: Int, params: Bundle?) {}
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onDestroy() {
+        speechRecognizer.destroy()
+        tts.stop()
+        tts.shutdown()
+        super.onDestroy()
+    }
+}
