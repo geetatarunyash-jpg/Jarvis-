@@ -22,36 +22,21 @@ class AiResponder(private val context: Context) {
         }
 
         return try {
-            val url = URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey")
+            val url = URL("https://api.groq.com/openai/v1/chat/completions")
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "POST"
             connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Authorization", "Bearer $apiKey")
             connection.doOutput = true
             connection.connectTimeout = 15000
             connection.readTimeout = 15000
 
-            val part = JSONObject().put("text", question)
-            val parts = JSONArray().put(part)
-            val content = JSONObject().put("parts", parts)
-            val contents = JSONArray().put(content)
-            val body = JSONObject().put("contents", contents)
+            val messages = JSONArray()
+            messages.put(JSONObject().put("role", "user").put("content", question))
 
-            connection.outputStream.use { it.write(body.toString().toByteArray()) }
+            val body = JSONObject()
+            body.put("model", "llama-3.3-70b-versatile")
+            body.put("messages", messages)
+            body.put("max_tokens", 300)
 
-            if (connection.responseCode == 200) {
-                val responseText = connection.inputStream.bufferedReader().use { it.readText() }
-                val json = JSONObject(responseText)
-                val candidates = json.getJSONArray("candidates")
-                val firstCandidate = candidates.getJSONObject(0)
-                val contentObj = firstCandidate.getJSONObject("content")
-                val partsArray = contentObj.getJSONArray("parts")
-                partsArray.getJSONObject(0).getString("text")
-            } else {
-                val errorText = connection.errorStream?.bufferedReader()?.use { it.readText() }
-                "I couldn't reach the AI. (${connection.responseCode}: ${errorText ?: "unknown error"})"
-            }
-        } catch (e: Exception) {
-            "I couldn't reach the AI right now. Check your internet connection."
-        }
-    }
-}
+            connection.outputStream.use
