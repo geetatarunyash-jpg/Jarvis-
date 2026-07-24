@@ -113,3 +113,27 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
             val heard = matches?.firstOrNull().orEmpty()
             binding.transcriptText.text = "You said: $heard"
+            commandProcessor.process(heard)
+        }
+
+        override fun onError(error: Int) {
+            stopListeningAnimation()
+            binding.statusText.text = "Didn't catch that — tap to try again"
+        }
+
+        override fun onReadyForSpeech(params: Bundle?) {}
+        override fun onBeginningOfSpeech() {}
+        override fun onRmsChanged(rmsdB: Float) {}
+        override fun onBufferReceived(buffer: ByteArray?) {}
+        override fun onEndOfSpeech() {}
+        override fun onPartialResults(partialResults: Bundle?) {}
+        override fun onEvent(eventType: Int, params: Bundle?) {}
+    }
+
+    override fun onDestroy() {
+        speechRecognizer.destroy()
+        tts.stop()
+        tts.shutdown()
+        super.onDestroy()
+    }
+}
