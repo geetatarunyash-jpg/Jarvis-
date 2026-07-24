@@ -7,7 +7,9 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -22,6 +24,8 @@ class WakeWordService : Service(), TextToSpeech.OnInitListener {
     private lateinit var tts: TextToSpeech
     private var ttsReady = false
     private var isListening = false
+    private val handler = Handler(Looper.getMainLooper())
+    private val restartDelayMs = 1200L
 
     override fun onCreate() {
         super.onCreate()
@@ -67,8 +71,19 @@ class WakeWordService : Service(), TextToSpeech.OnInitListener {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.US)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2000)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2000)
         }
-        speechRecognizer.startListening(intent)
+        try {
+            speechRecognizer.startListening(intent)
+        } catch (e: Exception) {
+            isListening = false
+            scheduleRestart()
+        }
+    }
+
+    private fun scheduleRestart() {
+        handler.postDelayed({ startListeningLoop() }, restartDelayMs)
     }
 
     private val recognitionListener = object : RecognitionListener {
@@ -82,15 +97,15 @@ class WakeWordService : Service(), TextToSpeech.OnInitListener {
                 if (command.isNotEmpty()) {
                     commandProcessor.process(command)
                 } else {
-                    if (ttsReady) tts.speak("Yes?", TextToSpeech.QUEUE_FLUSH, null, null)
+                    if (ttsReady) tts.speak("Yes sir?", TextToSpeech.QUEUE_FLUSH, null, null)
                 }
             }
-            startListeningLoop()
+            scheduleRestart()
         }
 
         override fun onError(error: Int) {
             isListening = false
-            startListeningLoop()
+            scheduleRestart()
         }
 
         override fun onReadyForSpeech(params: Bundle?) {}
@@ -105,6 +120,7 @@ class WakeWordService : Service(), TextToSpeech.OnInitListener {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        handler.removeCallbacksAndMessages(null)
         speechRecognizer.destroy()
         tts.stop()
         tts.shutdown()
