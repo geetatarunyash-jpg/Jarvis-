@@ -4,6 +4,8 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.speech.RecognitionListener
@@ -23,13 +25,13 @@ class WakeWordService : Service(), TextToSpeech.OnInitListener {
 
     override fun onCreate() {
         super.onCreate()
+        startForegroundNotification()
         tts = TextToSpeech(this, this)
         commandProcessor = CommandProcessor(this) { response ->
             if (ttsReady) tts.speak(response, TextToSpeech.QUEUE_FLUSH, null, null)
         }
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
         speechRecognizer.setRecognitionListener(recognitionListener)
-        startForegroundNotification()
         startListeningLoop()
     }
 
@@ -52,7 +54,11 @@ class WakeWordService : Service(), TextToSpeech.OnInitListener {
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .build()
 
-        startForeground(1, notification)
+        if (Build.VERSION.SDK_INT >= 29) {
+            startForeground(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+        } else {
+            startForeground(1, notification)
+        }
     }
 
     private fun startListeningLoop() {
