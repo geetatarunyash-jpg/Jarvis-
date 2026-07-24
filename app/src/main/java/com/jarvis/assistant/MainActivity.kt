@@ -3,6 +3,7 @@ package com.jarvis.assistant
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -27,6 +28,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (granted) startListening() else binding.statusText.text = "Microphone permission is needed for Jarvis to hear you."
     }
 
+    private val notificationPermissionRequest = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { startWakeWordService() }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -40,6 +45,27 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.micButton.setOnClickListener { checkPermissionAndListen() }
         binding.settingsButton.setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
+        }
+
+        requestNotificationPermissionThenStartService()
+    }
+
+    private fun requestNotificationPermissionThenStartService() {
+        if (Build.VERSION.SDK_INT >= 33) {
+            val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+                PackageManager.PERMISSION_GRANTED
+            if (granted) startWakeWordService() else notificationPermissionRequest.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            startWakeWordService()
+        }
+    }
+
+    private fun startWakeWordService() {
+        val hasMic = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        if (hasMic) {
+            val serviceIntent = Intent(this, WakeWordService::class.java)
+            ContextCompat.startForegroundService(this, serviceIntent)
         }
     }
 
@@ -87,27 +113,3 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
             val heard = matches?.firstOrNull().orEmpty()
             binding.transcriptText.text = "You said: $heard"
-            commandProcessor.process(heard)
-        }
-
-        override fun onError(error: Int) {
-            stopListeningAnimation()
-            binding.statusText.text = "Didn't catch that — tap to try again"
-        }
-
-        override fun onReadyForSpeech(params: Bundle?) {}
-        override fun onBeginningOfSpeech() {}
-        override fun onRmsChanged(rmsdB: Float) {}
-        override fun onBufferReceived(buffer: ByteArray?) {}
-        override fun onEndOfSpeech() {}
-        override fun onPartialResults(partialResults: Bundle?) {}
-        override fun onEvent(eventType: Int, params: Bundle?) {}
-    }
-
-    override fun onDestroy() {
-        speechRecognizer.destroy()
-        tts.stop()
-        tts.shutdown()
-        super.onDestroy()
-    }
-}
